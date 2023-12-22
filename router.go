@@ -3,7 +3,6 @@ package simple_server_runner
 import (
 	"errors"
 	"github.com/gin-gonic/gin"
-	"net/http"
 	"reflect"
 	"runtime"
 	"strings"
@@ -79,21 +78,13 @@ func (s *ServerRunner) autoBindRouter() error {
 			// 绑定请求参数到结构体
 			if c.Request.ContentLength > 0 {
 				if err := c.ShouldBind(paramValues[2].Addr().Interface()); err != nil {
-					c.JSON(http.StatusOK, CommonResponse{
-						Code: 500,
-						Msg:  err.Error(),
-						Data: nil,
-					})
+					s.responseFunc(c, nil, err)
 					return
 				}
 			}
 			// 绑定uri参数
 			if err := c.ShouldBindQuery(paramValues[2].Addr().Interface()); err != nil {
-				c.JSON(http.StatusOK, CommonResponse{
-					Code: 500,
-					Msg:  err.Error(),
-					Data: nil,
-				})
+				s.responseFunc(c, nil, err)
 				return
 			}
 
@@ -146,22 +137,14 @@ func (s *ServerRunner) BindRouter(method, path string, f interface{}) {
 		// 绑定请求参数到结构体
 		if c.Request.ContentLength > 0 {
 			if err := c.ShouldBind(paramValues[1].Addr().Interface()); err != nil {
-				c.JSON(http.StatusOK, CommonResponse{
-					Code: 500,
-					Msg:  err.Error(),
-					Data: nil,
-				})
+				s.responseFunc(c, nil, err)
 				return
 			}
 		}
 
 		// 绑定uri参数
 		if err := c.ShouldBindQuery(paramValues[1].Addr().Interface()); err != nil {
-			c.JSON(http.StatusOK, CommonResponse{
-				Code: 500,
-				Msg:  err.Error(),
-				Data: nil,
-			})
+			s.responseFunc(c, nil, err)
 			return
 		}
 
