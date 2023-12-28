@@ -77,3 +77,14 @@ runner.CustomResponse(func(ctx *gin.Context, data interface{}, err error) {
     return
 })
 ```
+
+### Empty request OR Empty response
+you can use `EmptyRequest` and `EmptyResponse`,you don't have to define an empty struct yourself.
+```go
+func GetAge(ctx *gin.Context, req simple_server_runner.EmptyRequest) (*simple_server_runner.EmptyResponse, error) {
+	if req.UserName == nil || *req.UserName == "" {
+		return nil, errors.New("user name is nil")
+	}
+	return &GetAgeResponse{Msg: fmt.Sprintf("%s is 20 years old", req.UserName)}, nil
+}
+
