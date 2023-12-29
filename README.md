@@ -6,7 +6,9 @@ when I use gin to codding my web server,i always need to bind request and write 
 
 In order to make codding web api easy, I write this repo.when I use it,I just need to define a struct and some method,the framework will auto bind to router use POST with JSON.
 
-method format like:  func (ctx *gin.Context,req {struct}) (resp {struct ptr},err error)
+method format like:  func (ctx *gin.Context,req {struct}) (resp {struct ptr},err error)  
+**OR**  
+autoBind will router the method that param start with `*gin.Context` and params less than 2
 
 ## How to use?
 
@@ -79,12 +81,10 @@ runner.CustomResponse(func(ctx *gin.Context, data interface{}, err error) {
 ```
 
 ### Empty request OR Empty response
-you can use `EmptyRequest` and `EmptyResponse`,you don't have to define an empty struct yourself.
+you don't have to define an empty struct yourself.
 ```go
-func GetAge(ctx *gin.Context, req simple_server_runner.EmptyRequest) (*simple_server_runner.EmptyResponse, error) {
-	if req.UserName == nil || *req.UserName == "" {
-		return nil, errors.New("user name is nil")
-	}
-	return &GetAgeResponse{Msg: fmt.Sprintf("%s is 20 years old", req.UserName)}, nil
+func GetAge(ctx *gin.Context) error {
+	// todo 
+	return nil
 }
 

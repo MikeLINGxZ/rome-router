@@ -15,56 +15,54 @@ func (s *ServerRunner) autoBindRouter() error {
 	methodNum := serverTypeOf.NumMethod()
 	// 遍历获取所有与公开方法
 	for i := 0; i < methodNum; i++ {
+		// 获取方法
 		method := serverTypeOf.Method(i)
+
 		// 排除私有方法和Run方法
 		_, ok := s.routerWhiteList[method.Name]
 		if !method.IsExported() || ok {
 			continue
 		}
 
+		// 获取函数信息
 		methodFundType := method.Func.Type()
 
-		//// 检查入参格式 ////
-		if methodFundType.NumIn() != 3 {
-			return errors.New("the input parameter format is incorrect")
+		// 检查入参数是否符合
+		if methodFundType.NumIn() != 2 && methodFundType.NumIn() != 3 {
+			continue
 		}
-		// 获取第一个参数的类型
-		firstInParamType := methodFundType.In(1)
 
 		// 判断第一个参数是否为 *gin.Context 类型
-		if firstInParamType != reflect.TypeOf(&gin.Context{}) {
-			return errors.New("first input parameter must be *gin.Context")
+		if methodFundType.In(1) != reflect.TypeOf(&gin.Context{}) {
+			continue
 		}
 
-		// 获取第二个参数的类型
-		secondInParamType := methodFundType.In(2)
-		// 判断第二个参数是否为结构体类型
-		if secondInParamType.Kind() != reflect.Struct {
-			return errors.New("second input parameter must be a struct")
+		// 如果参数有3个，代表有入参结构体
+		if methodFundType.NumIn() == 3 && methodFundType.In(2).Kind() != reflect.Struct {
+			continue
 		}
 
 		//// 检查出参格式 ////
-		if methodFundType.NumOut() != 2 {
-			return errors.New("the output parameter format is incorrect")
+		if methodFundType.NumOut() != 1 && methodFundType.NumOut() != 2 {
+			continue
 		}
 
-		// 获取第一个返回值的类型
-		firstOutReturnType := methodFundType.Out(0)
-
-		// 判断第一个返回值是否为切片或结构体
-		switch firstOutReturnType.Kind() {
-		case reflect.Slice, reflect.Struct, reflect.Ptr:
-			// 第一个返回值是切片或结构体，继续检查第二个返回值
-		default:
-			return errors.New("first return value must be a slice or struct")
-		}
-
-		// 获取第二个返回值的类型
-		secondOutReturnType := methodFundType.Out(1)
-
-		// 判断第二个返回值是否为 error 类型
-		if secondOutReturnType != reflect.TypeOf((*error)(nil)).Elem() {
-			return errors.New("second return value must be of type error")
+		if methodFundType.NumOut() == 1 {
+			if methodFundType.Out(0) != reflect.TypeOf((*error)(nil)).Elem() {
+				return errors.New("sign return value must be of type error")
+			}
+		} else if methodFundType.NumOut() == 2 {
+			// 判断第一个返回值是否为切片或结构体
+			switch methodFundType.Out(0).Kind() {
+			case reflect.Slice, reflect.Struct, reflect.Ptr:
+				// 第一个返回值是切片或结构体，继续检查第二个返回值
+			default:
+				return errors.New("first return value must be a slice or struct")
+			}
+			// 判断第二个返回值是否为 error 类型
+			if methodFundType.Out(1) != reflect.TypeOf((*error)(nil)).Elem() {
+				return errors.New("second return value must be of type error")
+			}
 		}
 
 		// 创建 Gin 路由处理函数
@@ -73,33 +71,41 @@ func (s *ServerRunner) autoBindRouter() error {
 			paramValues := make([]reflect.Value, 3)
 			paramValues[0] = reflect.ValueOf(s.server).Elem().Addr()
 			paramValues[1] = reflect.ValueOf(c).Elem().Addr()
-			paramValues[2] = reflect.New(methodFundType.In(2)).Elem()
-
-			// 绑定请求参数到结构体
-			if c.Request.ContentLength > 0 {
-				if err := c.ShouldBind(paramValues[2].Addr().Interface()); err != nil {
+			if methodFundType.NumIn() == 3 {
+				paramValues[2] = reflect.New(methodFundType.In(2)).Elem()
+				// 绑定请求参数到结构体
+				if c.Request.ContentLength > 0 {
+					if err := c.ShouldBind(paramValues[2].Addr().Interface()); err != nil {
+						s.responseFunc(c, nil, err)
+						return
+					}
+				}
+				// 绑定uri参数
+				if err := c.ShouldBindQuery(paramValues[2].Addr().Interface()); err != nil {
 					s.responseFunc(c, nil, err)
 					return
 				}
 			}
-			// 绑定uri参数
-			if err := c.ShouldBindQuery(paramValues[2].Addr().Interface()); err != nil {
-				s.responseFunc(c, nil, err)
-				return
-			}
-
-			// toto 调用函数
-			returnValues := method.Func.Call(paramValues)
 
 			// 处理返回值
 			var resultValue interface{}
-			if returnValues[0].IsValid() && returnValues[0].Kind() == reflect.Ptr && returnValues[0].Elem().IsValid() {
-				resultValue = returnValues[0].Elem().Interface()
-			} else if returnValues[0].IsValid() && returnValues[0].Kind() == reflect.Slice {
-				resultValue = returnValues[0].Interface()
+			var errValue error
+
+			// 调用函数
+			returnValues := method.Func.Call(paramValues)
+
+			// 判断返回
+			if methodFundType.NumOut() == 1 {
+				errValue, _ = returnValues[0].Interface().(error)
+			} else if methodFundType.NumOut() == 2 {
+				if returnValues[0].IsValid() && returnValues[0].Kind() == reflect.Ptr && returnValues[0].Elem().IsValid() {
+					resultValue = returnValues[0].Elem().Interface()
+				} else if returnValues[0].IsValid() && returnValues[0].Kind() == reflect.Slice {
+					resultValue = returnValues[0].Interface()
+				}
+				errValue, _ = returnValues[1].Interface().(error)
 			}
 
-			errValue, _ := returnValues[1].Interface().(error)
 			s.responseFunc(c, resultValue, errValue)
 		}
 		// 添加路由
@@ -130,22 +136,22 @@ func (s *ServerRunner) BindRouter(method, path string, f interface{}) {
 	// 创建 Gin 路由处理函数
 	handlerFunc := func(c *gin.Context) {
 		// 创建参数值的切片
-		paramValues := make([]reflect.Value, 2)
+		paramValues := make([]reflect.Value, funcType.NumIn())
 		paramValues[0] = reflect.ValueOf(c).Elem().Addr()
-		paramValues[1] = reflect.New(funcType.In(1)).Elem()
-
-		// 绑定请求参数到结构体
-		if c.Request.ContentLength > 0 {
-			if err := c.ShouldBind(paramValues[1].Addr().Interface()); err != nil {
+		if funcType.NumIn() == 2 {
+			paramValues[1] = reflect.New(funcType.In(1)).Elem()
+			// 绑定请求参数到结构体
+			if c.Request.ContentLength > 0 {
+				if err := c.ShouldBind(paramValues[1].Addr().Interface()); err != nil {
+					s.responseFunc(c, nil, err)
+					return
+				}
+			}
+			// 绑定uri参数
+			if err := c.ShouldBindQuery(paramValues[1].Addr().Interface()); err != nil {
 				s.responseFunc(c, nil, err)
 				return
 			}
-		}
-
-		// 绑定uri参数
-		if err := c.ShouldBindQuery(paramValues[1].Addr().Interface()); err != nil {
-			s.responseFunc(c, nil, err)
-			return
 		}
 
 		// 调用函数
@@ -153,12 +159,18 @@ func (s *ServerRunner) BindRouter(method, path string, f interface{}) {
 
 		// 处理返回值
 		var resultValue interface{}
-		if returnValues[0].IsValid() && returnValues[0].Kind() == reflect.Ptr && returnValues[0].Elem().IsValid() {
-			resultValue = returnValues[0].Elem().Interface()
-		} else if returnValues[0].IsValid() && returnValues[0].Kind() == reflect.Slice {
-			resultValue = returnValues[0].Interface()
+		var errValue error
+
+		if funcType.NumOut() == 1 {
+			errValue, _ = returnValues[0].Interface().(error)
+		} else if funcType.NumOut() == 2 {
+			if returnValues[0].IsValid() && returnValues[0].Kind() == reflect.Ptr && returnValues[0].Elem().IsValid() {
+				resultValue = returnValues[0].Elem().Interface()
+			} else if returnValues[0].IsValid() && returnValues[0].Kind() == reflect.Slice {
+				resultValue = returnValues[0].Interface()
+			}
+			errValue, _ = returnValues[1].Interface().(error)
 		}
-		errValue, _ := returnValues[1].Interface().(error)
 
 		s.responseFunc(c, resultValue, errValue)
 
@@ -192,7 +204,7 @@ func (s *ServerRunner) checkInputParams(funcType reflect.Type) error {
 	numIn := funcType.NumIn()
 
 	// 判断参数是否符合要求
-	if numIn != 2 {
+	if numIn != 1 && numIn != 2 {
 		return errors.New("func must have exactly 2 input parameters")
 	}
 
@@ -204,13 +216,10 @@ func (s *ServerRunner) checkInputParams(funcType reflect.Type) error {
 		return errors.New("first input parameter must be *gin.Context")
 	}
 
-	// 获取第二个参数的类型
-	secondParamType := funcType.In(1)
-
-	// 判断第二个参数是否为结构体类型
-	if secondParamType.Kind() != reflect.Struct {
+	if numIn == 2 && funcType.In(1).Kind() != reflect.Struct {
 		return errors.New("second input parameter must be a struct")
 	}
+
 	return nil
 }
 
@@ -220,27 +229,28 @@ func (s *ServerRunner) checkReturnValues(funcType reflect.Type) error {
 	numOut := funcType.NumOut()
 
 	// 判断返回值是否符合要求
-	if numOut != 2 {
+	if numOut != 1 && numOut != 2 {
 		return errors.New("func must have exactly 2 return values")
 	}
 
-	// 获取第一个返回值的类型
-	firstReturnType := funcType.Out(0)
+	if numOut == 1 {
+		if funcType.Out(0) != reflect.TypeOf((*error)(nil)).Elem() {
+			return errors.New("second return value must be of type error")
+		}
+	} else if numOut == 2 {
 
-	// 判断第一个返回值是否为切片或结构体
-	switch firstReturnType.Kind() {
-	case reflect.Slice, reflect.Struct, reflect.Ptr:
-		// 第一个返回值是切片或结构体，继续检查第二个返回值
-	default:
-		return errors.New("first return value must be a slice or struct")
-	}
+		// 判断第一个返回值是否为切片或结构体
+		switch funcType.Out(0).Kind() {
+		case reflect.Slice, reflect.Struct, reflect.Ptr:
+			// 第一个返回值是切片或结构体，继续检查第二个返回值
+		default:
+			return errors.New("first return value must be a slice or struct")
+		}
 
-	// 获取第二个返回值的类型
-	secondReturnType := funcType.Out(1)
-
-	// 判断第二个返回值是否为 error 类型
-	if secondReturnType != reflect.TypeOf((*error)(nil)).Elem() {
-		return errors.New("second return value must be of type error")
+		// 判断第二个返回值是否为 error 类型
+		if funcType.Out(1) != reflect.TypeOf((*error)(nil)).Elem() {
+			return errors.New("second return value must be of type error")
+		}
 	}
 
 	return nil
