@@ -7,7 +7,7 @@ when I use gin to codding my web server,i always need to bind request and write 
 In order to make codding web api easy, I write this repo.when I use it,I just need to define a struct and some method,the framework will auto bind to router use POST with JSON.
 
 method format like:  func (ctx *gin.Context,req {struct}) (resp {struct ptr},err error)  
-**OR**
+**OR**  
 autoBind will router the method that param start with `*gin.Context` and params less than 2
 
 ## How to use?
