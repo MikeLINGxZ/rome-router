@@ -67,10 +67,15 @@ runner.BindRouter("GET", "GetAge", GetAge)
 
 ### Custom your response
 ```go
-runner.CustomResponse(func(ctx *gin.Context, data interface{}, err error) {
+runner.CustomResponse(func(ctx *gin.Context, data interface{}, errInterface interface{}) {
     resp := CustomResponse{}
-    if err != nil {
-        resp.Error = err.Error()
+    if errInterface != nil {
+        err, ok := errInterface.(*CustomResponse)
+        if ok {
+            resp.Error = err.Error
+        } else {
+            resp.Error = "gg"
+        }
         ctx.JSON(http.StatusBadGateway, resp)
         return
     }
@@ -87,4 +92,30 @@ func GetAge(ctx *gin.Context) error {
 	// todo 
 	return nil
 }
+```
 
+
+### visible errors
+visible errors will show error to client
+```go
+func CustomErrorWithAuto(ctx *gin.Context) error {
+	log.Println("NothingToDo")
+	return simple_server_runner.NewCustomError("test error")
+}
+```
+custom error will show show：
+```json
+{
+    "code": 500,
+    "msg": "your custom error",
+    "data": null
+}
+```
+other error will show: 
+```json
+{
+  "code": 500,
+  "msg": "internal error",
+  "data": null
+}
+```

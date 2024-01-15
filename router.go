@@ -89,24 +89,24 @@ func (s *ServerRunner) autoBindRouter() error {
 
 			// 处理返回值
 			var resultValue interface{}
-			var errValue error
+			var errInterface interface{}
 
 			// 调用函数
 			returnValues := method.Func.Call(paramValues)
 
 			// 判断返回
 			if methodFundType.NumOut() == 1 {
-				errValue, _ = returnValues[0].Interface().(error)
+				errInterface = returnValues[0].Interface()
 			} else if methodFundType.NumOut() == 2 {
 				if returnValues[0].IsValid() && returnValues[0].Kind() == reflect.Ptr && returnValues[0].Elem().IsValid() {
 					resultValue = returnValues[0].Elem().Interface()
 				} else if returnValues[0].IsValid() && returnValues[0].Kind() == reflect.Slice {
 					resultValue = returnValues[0].Interface()
 				}
-				errValue, _ = returnValues[1].Interface().(error)
+				errInterface = returnValues[1].Interface()
 			}
 
-			s.responseFunc(c, resultValue, errValue)
+			s.responseFunc(c, resultValue, errInterface)
 		}
 		// 添加路由
 		s.gin.Handle("POST", method.Name, handlerFunc)
@@ -159,20 +159,20 @@ func (s *ServerRunner) BindRouter(method, path string, f interface{}) {
 
 		// 处理返回值
 		var resultValue interface{}
-		var errValue error
+		var errInterface interface{}
 
 		if funcType.NumOut() == 1 {
-			errValue, _ = returnValues[0].Interface().(error)
+			errInterface = returnValues[0].Interface()
 		} else if funcType.NumOut() == 2 {
 			if returnValues[0].IsValid() && returnValues[0].Kind() == reflect.Ptr && returnValues[0].Elem().IsValid() {
 				resultValue = returnValues[0].Elem().Interface()
 			} else if returnValues[0].IsValid() && returnValues[0].Kind() == reflect.Slice {
 				resultValue = returnValues[0].Interface()
 			}
-			errValue, _ = returnValues[1].Interface().(error)
+			errInterface = returnValues[1].Interface()
 		}
 
-		s.responseFunc(c, resultValue, errValue)
+		s.responseFunc(c, resultValue, errInterface)
 
 	}
 	functionName := s.getFunctionName(f)

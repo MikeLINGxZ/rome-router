@@ -9,7 +9,7 @@ type ServerRunner struct {
 	gin             *gin.Engine
 	server          interface{}
 	routerWhiteList map[string]struct{}
-	responseFunc    func(ctx *gin.Context, data interface{}, err error)
+	responseFunc    func(ctx *gin.Context, data interface{}, errInterface interface{})
 }
 
 func NewDefaultServerRunner(server interface{}) *ServerRunner {
@@ -39,7 +39,7 @@ func (s *ServerRunner) Gin() *gin.Engine {
 	return s.gin
 }
 
-func (s *ServerRunner) CustomResponse(f func(ctx *gin.Context, data interface{}, err error)) {
+func (s *ServerRunner) CustomResponse(f func(ctx *gin.Context, data interface{}, errInterface interface{})) {
 	s.responseFunc = f
 }
 
@@ -64,8 +64,17 @@ type CommonResponse struct {
 }
 
 // defaultResponse 默认返回
-func (s *ServerRunner) defaultResponse(ctx *gin.Context, data interface{}, err error) {
+func (s *ServerRunner) defaultResponse(ctx *gin.Context, data interface{}, errInterface interface{}) {
 	commonResponse := CommonResponse{}
+	_, ok := errInterface.(*CustomError)
+	if ok {
+		commonResponse.Code = 500
+		commonResponse.Msg = "internal error"
+
+		ctx.JSON(http.StatusOK, commonResponse)
+		return
+	}
+	err := errInterface.(error)
 	if err != nil {
 		commonResponse.Code = 500
 		commonResponse.Msg = err.Error()
@@ -75,4 +84,16 @@ func (s *ServerRunner) defaultResponse(ctx *gin.Context, data interface{}, err e
 	}
 
 	ctx.JSON(http.StatusOK, commonResponse)
+}
+
+type CustomError struct {
+	s string
+}
+
+func (e *CustomError) Error() string {
+	return e.s
+}
+
+func NewCustomError(text string) *CustomError {
+	return &CustomError{text}
 }
