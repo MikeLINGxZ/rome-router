@@ -28,8 +28,8 @@ func defaultResponse(ctx *gin.Context, data interface{}, errInterface interface{
 		ctx.JSON(http.StatusOK, commonResponse)
 		return
 	}
-	err := errInterface.(error)
-	if err != nil {
+	err, ok := errInterface.(error)
+	if ok && err != nil {
 		commonResponse.Code = 500
 		commonResponse.Msg = err.Error()
 	} else {
