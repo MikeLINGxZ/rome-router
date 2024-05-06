@@ -8,8 +8,11 @@ import (
 	"strings"
 )
 
-func (s *ServerRunner) autoBindRouter() error {
-	serverTypeOf := reflect.TypeOf(s.server)
+func autoBindRouter(ginEngine *gin.Engine, serverGroup ServerGroup, responseFunc func(ctx *gin.Context, data, err interface{})) error {
+	if serverGroup.Server == nil {
+		return nil
+	}
+	serverTypeOf := reflect.TypeOf(serverGroup.Server)
 
 	// 获取方法数量
 	methodNum := serverTypeOf.NumMethod()
@@ -18,9 +21,8 @@ func (s *ServerRunner) autoBindRouter() error {
 		// 获取方法
 		method := serverTypeOf.Method(i)
 
-		// 排除私有方法和Run方法
-		_, ok := s.routerWhiteList[method.Name]
-		if !method.IsExported() || ok {
+		// 排除私有方法
+		if !method.IsExported() {
 			continue
 		}
 
@@ -69,20 +71,20 @@ func (s *ServerRunner) autoBindRouter() error {
 		handlerFunc := func(c *gin.Context) {
 			// 创建参数值的切片
 			paramValues := make([]reflect.Value, 3)
-			paramValues[0] = reflect.ValueOf(s.server).Elem().Addr()
+			paramValues[0] = reflect.ValueOf(serverGroup.Server).Elem().Addr()
 			paramValues[1] = reflect.ValueOf(c).Elem().Addr()
 			if methodFundType.NumIn() == 3 {
 				paramValues[2] = reflect.New(methodFundType.In(2)).Elem()
 				// 绑定请求参数到结构体
 				if c.Request.ContentLength > 0 {
 					if err := c.ShouldBind(paramValues[2].Addr().Interface()); err != nil {
-						s.responseFunc(c, nil, err)
+						responseFunc(c, nil, err)
 						return
 					}
 				}
 				// 绑定uri参数
 				if err := c.ShouldBindQuery(paramValues[2].Addr().Interface()); err != nil {
-					s.responseFunc(c, nil, err)
+					responseFunc(c, nil, err)
 					return
 				}
 			}
@@ -106,15 +108,16 @@ func (s *ServerRunner) autoBindRouter() error {
 				errInterface = returnValues[1].Interface()
 			}
 
-			s.responseFunc(c, resultValue, errInterface)
+			responseFunc(c, resultValue, errInterface)
 		}
+
 		// 添加路由
-		s.gin.Handle("POST", method.Name, handlerFunc)
+		ginEngine.Handle("POST", serverGroup.Name+"/"+method.Name, handlerFunc).Use(serverGroup.Middlewares...)
 	}
 	return nil
 }
 
-func (s *ServerRunner) BindRouter(method, path string, f interface{}) {
+func (s *ServerRunner) BindRouter(method, path string, f interface{}, middlewares []gin.HandlerFunc) {
 	// 检查f是否为一个可调用的函数
 	funcType := reflect.TypeOf(f)
 	if funcType.Kind() != reflect.Func {
@@ -175,10 +178,8 @@ func (s *ServerRunner) BindRouter(method, path string, f interface{}) {
 		s.responseFunc(c, resultValue, errInterface)
 
 	}
-	functionName := s.getFunctionName(f)
-	s.routerWhiteList[functionName] = struct{}{}
 	// 添加路由
-	s.gin.Handle(method, path, handlerFunc)
+	s.gin.Handle(method, path, handlerFunc).Use(middlewares...)
 }
 
 // getFunctionName 获取f的方法名

@@ -15,12 +15,17 @@ type CustomResponse struct {
 }
 
 func main() {
-	runner := simple_server_runner.NewDefaultServerRunner(&Server{})
+	runner := simple_server_runner.NewServerRunner()
+	runner.AddServerGroup(simple_server_runner.ServerGroup{
+		Name:        "api",
+		Server:      &Server{},
+		Middlewares: nil,
+	})
 
-	runner.BindRouter("GET", "GetAge", GetAge)
-	runner.BindRouter("GET", "NothingToDoWithAuto", NothingToDoWithAuto)
-	runner.BindRouter("GET", "ErrorWithAuto", ErrorWithAuto)
-	runner.BindRouter("GET", "CustomErrorWithAuto", CustomErrorWithAuto)
+	runner.BindRouter("GET", "GetAge", GetAge, nil)
+	runner.BindRouter("GET", "NothingToDoWithAuto", NothingToDoWithAuto, nil)
+	runner.BindRouter("GET", "ErrorWithAuto", ErrorWithAuto, nil)
+	runner.BindRouter("GET", "CustomErrorWithAuto", CustomErrorWithAuto, nil)
 
 	runner.CustomResponse(func(ctx *gin.Context, data interface{}, errInterface interface{}) {
 		resp := CustomResponse{}
