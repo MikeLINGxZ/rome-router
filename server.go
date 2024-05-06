@@ -20,16 +20,18 @@ type ServerRunner struct {
 
 func NewDefaultServerRunner(server interface{}) *ServerRunner {
 	return &ServerRunner{
-		gin:           gin.Default(),
-		defaultServer: server,
-		responseFunc:  defaultResponse,
+		gin:             gin.Default(),
+		defaultServer:   server,
+		responseFunc:    defaultResponse,
+		routerWhiteList: map[string]struct{}{},
 	}
 }
 
 func NewServerRunner() *ServerRunner {
 	return &ServerRunner{
-		gin:          gin.Default(),
-		responseFunc: defaultResponse,
+		gin:             gin.Default(),
+		responseFunc:    defaultResponse,
+		routerWhiteList: map[string]struct{}{},
 	}
 }
 
