@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-func autoBindRouter(ginEngine *gin.Engine, serverGroup ServerGroup, responseFunc func(ctx *gin.Context, data, err interface{})) error {
+func autoBindRouter(ginEngine *gin.Engine, whileRouter map[string]struct{}, serverGroup ServerGroup, responseFunc func(ctx *gin.Context, data, err interface{})) error {
 	if serverGroup.Server == nil {
 		return nil
 	}
@@ -27,6 +27,12 @@ func autoBindRouter(ginEngine *gin.Engine, serverGroup ServerGroup, responseFunc
 
 		// 排除私有方法
 		if !method.IsExported() {
+			continue
+		}
+
+		// 排除已注册路由
+		_, ok := whileRouter[serverGroup.Name+"/"+method.Name]
+		if ok {
 			continue
 		}
 
@@ -117,6 +123,7 @@ func autoBindRouter(ginEngine *gin.Engine, serverGroup ServerGroup, responseFunc
 
 		// 添加路由
 		ginGroup.Handle("POST", method.Name, handlerFunc)
+		whileRouter[serverGroup.Name+"/"+method.Name] = struct{}{}
 	}
 	ginGroup.Use(serverGroup.Middlewares...)
 	return nil
@@ -185,6 +192,7 @@ func (s *ServerRunner) BindRouter(method, path string, f interface{}, middleware
 	}
 	// 添加路由
 	s.gin.Handle(method, path, handlerFunc).Use(middlewares...)
+	s.routerWhiteList["/"+path] = struct{}{}
 }
 
 // getFunctionName 获取f的方法名

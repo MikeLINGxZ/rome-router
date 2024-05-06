@@ -36,7 +36,7 @@ func NewServerRunner() *ServerRunner {
 func (s *ServerRunner) Run(addr ...string) error {
 
 	// default
-	err := autoBindRouter(s.gin, ServerGroup{"", s.defaultServer, nil}, s.responseFunc)
+	err := autoBindRouter(s.gin, s.routerWhiteList, ServerGroup{"", s.defaultServer, nil}, s.responseFunc)
 	if err != nil {
 		return err
 	}
