@@ -44,7 +44,7 @@ func (s *ServerRunner) Run(addr ...string) error {
 	// group
 	for _, item := range s.serverGroup {
 		item := item
-		err := autoBindRouter(s.gin, item, s.responseFunc)
+		err := autoBindRouter(s.gin, s.routerWhiteList, item, s.responseFunc)
 		if err != nil {
 			return err
 		}
