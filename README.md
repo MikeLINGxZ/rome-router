@@ -33,11 +33,24 @@ func (s *Server) GetUser(ctx *gin.Context, req GetUserRequest) (*GetUserResponse
 	return &GetUserResponse{Msg: "hello,im " + req.UserName}, nil
 }
 ```
-### init your server and run
+### init your default server and run
 ```go
 runner := simple_server_runner.NewDefaultServerRunner(&Server{})
 runner.Run()
 ```
+### OR
+### init your custom server and run
+```go
+runner := simple_server_runner.NewServerRunner()
+runner.AddServerGroup(ssr.ServerGroup{
+    Name:        "api",
+    Server:      &Server{},
+    Middlewares: []gin.HandlerFunc{Auth, Cors},
+}) // url: /api/{method name}
+runner.BindRouter("POST", "/api/Login", (&Server{}).Login, []gin.HandlerFunc{Cors})
+runner.Run()
+```
+
 
 ## Others
 
