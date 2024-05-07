@@ -15,15 +15,27 @@ type CustomResponse struct {
 }
 
 func main() {
-	runner := simple_server_runner.NewDefaultServerRunner(&Server{})
+	runner := simple_server_runner.NewServerRunner()
+	runner.AddServerGroup(simple_server_runner.ServerGroup{
+		Name:        "api",
+		Server:      &Server{},
+		Middlewares: nil,
+	})
 
-	runner.BindRouter("GET", "GetAge", GetAge)
-	runner.BindRouter("GET", "NothingToDoWithAuto", NothingToDoWithAuto)
+	runner.BindRouter("GET", "GetAge", GetAge, nil)
+	runner.BindRouter("GET", "NothingToDoWithAuto", NothingToDoWithAuto, nil)
+	runner.BindRouter("GET", "ErrorWithAuto", ErrorWithAuto, nil)
+	runner.BindRouter("GET", "CustomErrorWithAuto", CustomErrorWithAuto, nil)
 
-	runner.CustomResponse(func(ctx *gin.Context, data interface{}, err error) {
+	runner.CustomResponse(func(ctx *gin.Context, data interface{}, errInterface interface{}) {
 		resp := CustomResponse{}
-		if err != nil {
-			resp.Error = err.Error()
+		if errInterface != nil {
+			err, ok := errInterface.(*CustomResponse)
+			if ok {
+				resp.Error = err.Error
+			} else {
+				resp.Error = "gg"
+			}
 			ctx.JSON(http.StatusBadGateway, resp)
 			return
 		}
@@ -76,4 +88,14 @@ func GetAge(ctx *gin.Context, req GetAgeRequest) (*GetAgeResponse, error) {
 func NothingToDoWithAuto(ctx *gin.Context) error {
 	log.Println("NothingToDo")
 	return nil
+}
+
+func CustomErrorWithAuto(ctx *gin.Context) error {
+	log.Println("NothingToDo")
+	return simple_server_runner.NewCustomError("test error")
+}
+
+func ErrorWithAuto(ctx *gin.Context) error {
+	log.Println("NothingToDo")
+	return errors.New("test error")
 }

@@ -8,19 +8,31 @@ import (
 	"strings"
 )
 
-func (s *ServerRunner) autoBindRouter() error {
-	serverTypeOf := reflect.TypeOf(s.server)
+func autoBindRouter(ginEngine *gin.Engine, whileRouter map[string]struct{}, serverGroup ServerGroup, responseFunc func(ctx *gin.Context, data, err interface{})) error {
+	if serverGroup.Server == nil {
+		return nil
+	}
+	serverTypeOf := reflect.TypeOf(serverGroup.Server)
 
 	// 获取方法数量
 	methodNum := serverTypeOf.NumMethod()
+
+	//
+	ginGroup := ginEngine.Group(serverGroup.Name)
+
 	// 遍历获取所有与公开方法
 	for i := 0; i < methodNum; i++ {
 		// 获取方法
 		method := serverTypeOf.Method(i)
 
-		// 排除私有方法和Run方法
-		_, ok := s.routerWhiteList[method.Name]
-		if !method.IsExported() || ok {
+		// 排除私有方法
+		if !method.IsExported() {
+			continue
+		}
+
+		// 排除已注册路由
+		_, ok := whileRouter["/"+serverGroup.Name+"/"+method.Name]
+		if ok {
 			continue
 		}
 
@@ -69,52 +81,55 @@ func (s *ServerRunner) autoBindRouter() error {
 		handlerFunc := func(c *gin.Context) {
 			// 创建参数值的切片
 			paramValues := make([]reflect.Value, 3)
-			paramValues[0] = reflect.ValueOf(s.server).Elem().Addr()
+			paramValues[0] = reflect.ValueOf(serverGroup.Server).Elem().Addr()
 			paramValues[1] = reflect.ValueOf(c).Elem().Addr()
 			if methodFundType.NumIn() == 3 {
 				paramValues[2] = reflect.New(methodFundType.In(2)).Elem()
 				// 绑定请求参数到结构体
 				if c.Request.ContentLength > 0 {
 					if err := c.ShouldBind(paramValues[2].Addr().Interface()); err != nil {
-						s.responseFunc(c, nil, err)
+						responseFunc(c, nil, err)
 						return
 					}
 				}
 				// 绑定uri参数
 				if err := c.ShouldBindQuery(paramValues[2].Addr().Interface()); err != nil {
-					s.responseFunc(c, nil, err)
+					responseFunc(c, nil, err)
 					return
 				}
 			}
 
 			// 处理返回值
 			var resultValue interface{}
-			var errValue error
+			var errInterface interface{}
 
 			// 调用函数
 			returnValues := method.Func.Call(paramValues)
 
 			// 判断返回
 			if methodFundType.NumOut() == 1 {
-				errValue, _ = returnValues[0].Interface().(error)
+				errInterface = returnValues[0].Interface()
 			} else if methodFundType.NumOut() == 2 {
 				if returnValues[0].IsValid() && returnValues[0].Kind() == reflect.Ptr && returnValues[0].Elem().IsValid() {
 					resultValue = returnValues[0].Elem().Interface()
 				} else if returnValues[0].IsValid() && returnValues[0].Kind() == reflect.Slice {
 					resultValue = returnValues[0].Interface()
 				}
-				errValue, _ = returnValues[1].Interface().(error)
+				errInterface = returnValues[1].Interface()
 			}
 
-			s.responseFunc(c, resultValue, errValue)
+			responseFunc(c, resultValue, errInterface)
 		}
+
 		// 添加路由
-		s.gin.Handle("POST", method.Name, handlerFunc)
+		ginGroup.Handle("POST", method.Name, handlerFunc)
+		whileRouter["/"+serverGroup.Name+"/"+method.Name] = struct{}{}
 	}
+	ginGroup.Use(serverGroup.Middlewares...)
 	return nil
 }
 
-func (s *ServerRunner) BindRouter(method, path string, f interface{}) {
+func (s *ServerRunner) BindRouter(method, path string, f interface{}, middlewares []gin.HandlerFunc) {
 	// 检查f是否为一个可调用的函数
 	funcType := reflect.TypeOf(f)
 	if funcType.Kind() != reflect.Func {
@@ -159,26 +174,25 @@ func (s *ServerRunner) BindRouter(method, path string, f interface{}) {
 
 		// 处理返回值
 		var resultValue interface{}
-		var errValue error
+		var errInterface interface{}
 
 		if funcType.NumOut() == 1 {
-			errValue, _ = returnValues[0].Interface().(error)
+			errInterface = returnValues[0].Interface()
 		} else if funcType.NumOut() == 2 {
 			if returnValues[0].IsValid() && returnValues[0].Kind() == reflect.Ptr && returnValues[0].Elem().IsValid() {
 				resultValue = returnValues[0].Elem().Interface()
 			} else if returnValues[0].IsValid() && returnValues[0].Kind() == reflect.Slice {
 				resultValue = returnValues[0].Interface()
 			}
-			errValue, _ = returnValues[1].Interface().(error)
+			errInterface = returnValues[1].Interface()
 		}
 
-		s.responseFunc(c, resultValue, errValue)
+		s.responseFunc(c, resultValue, errInterface)
 
 	}
-	functionName := s.getFunctionName(f)
-	s.routerWhiteList[functionName] = struct{}{}
 	// 添加路由
-	s.gin.Handle(method, path, handlerFunc)
+	s.gin.Handle(method, path, handlerFunc).Use(middlewares...)
+	s.routerWhiteList[path] = struct{}{}
 }
 
 // getFunctionName 获取f的方法名
