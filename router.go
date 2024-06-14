@@ -2,6 +2,7 @@ package simple_server_runner
 
 import (
 	"errors"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"net/url"
 	"reflect"
@@ -18,6 +19,8 @@ func autoBindRouter(ginEngine *gin.Engine, whileRouter map[string]struct{}, serv
 	// 获取方法数量
 	methodNum := serverTypeOf.NumMethod()
 
+	ginGroup := ginEngine.Group(serverGroup.Name).Use(serverGroup.Middlewares...)
+
 	// 遍历获取所有与公开方法
 	for i := 0; i < methodNum; i++ {
 		// 获取方法
@@ -28,11 +31,11 @@ func autoBindRouter(ginEngine *gin.Engine, whileRouter map[string]struct{}, serv
 			continue
 		}
 
-		routerUri, err := url.JoinPath(serverGroup.Name, method.Name)
+		routerUri, err := url.JoinPath("/", serverGroup.Name, method.Name)
 		if err != nil {
 			return err
 		}
-
+		fmt.Println(routerUri)
 		// 排除已注册路由
 		_, ok := whileRouter[routerUri]
 		if ok {
@@ -123,9 +126,8 @@ func autoBindRouter(ginEngine *gin.Engine, whileRouter map[string]struct{}, serv
 
 			responseFunc(c, resultValue, errInterface)
 		}
-
+		ginGroup.Handle("POST", method.Name, handlerFunc)
 		// 添加路由
-		ginEngine.Handle("POST", routerUri, handlerFunc).Use(serverGroup.Middlewares...)
 		whileRouter[routerUri] = struct{}{}
 	}
 	return nil
@@ -193,7 +195,7 @@ func (s *ServerRunner) BindRouter(method, path string, f interface{}, middleware
 
 	}
 	// 添加路由
-	s.gin.Handle(method, path, handlerFunc).Use(middlewares...)
+	s.gin.Handle(method, path, append([]gin.HandlerFunc{handlerFunc}, middlewares...)...)
 	s.routerWhiteList[path] = struct{}{}
 }
 
