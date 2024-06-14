@@ -3,6 +3,7 @@ package simple_server_runner
 import (
 	"errors"
 	"github.com/gin-gonic/gin"
+	"net/url"
 	"reflect"
 	"runtime"
 	"strings"
@@ -30,8 +31,13 @@ func autoBindRouter(ginEngine *gin.Engine, whileRouter map[string]struct{}, serv
 			continue
 		}
 
+		routerUri, err := url.JoinPath(serverGroup.Name, method.Name)
+		if err != nil {
+			return err
+		}
+
 		// 排除已注册路由
-		_, ok := whileRouter["/"+serverGroup.Name+"/"+method.Name]
+		_, ok := whileRouter[routerUri]
 		if ok {
 			continue
 		}
@@ -122,10 +128,9 @@ func autoBindRouter(ginEngine *gin.Engine, whileRouter map[string]struct{}, serv
 		}
 
 		// 添加路由
-		ginGroup.Handle("POST", method.Name, handlerFunc)
-		whileRouter["/"+serverGroup.Name+"/"+method.Name] = struct{}{}
+		ginGroup.Handle("POST", method.Name, handlerFunc).Use(serverGroup.Middlewares...)
+		whileRouter[routerUri] = struct{}{}
 	}
-	ginGroup.Use(serverGroup.Middlewares...)
 	return nil
 }
 
