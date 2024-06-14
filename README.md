@@ -50,7 +50,14 @@ runner.AddServerGroup(ssr.ServerGroup{
 runner.BindRouter("POST", "/api/Login", (&Server{}).Login, []gin.HandlerFunc{Cors})
 runner.Run()
 ```
-
+you will see
+```
+[GIN-debug] POST   /api/GetUser              --> github.com/MikeLINGxZ/simple-server-runner.autoBindRouter.func1 (3 handlers)
+[GIN-debug] POST   /api/NothingToDo          --> github.com/MikeLINGxZ/simple-server-runner.autoBindRouter.func1 (3 handlers)
+[GIN-debug] [WARNING] You trusted all proxies, this is NOT safe. We recommend you to set a value.
+Please check https://pkg.go.dev/github.com/gin-gonic/gin#readme-don-t-trust-all-proxies for details.
+[GIN-debug] Listening and serving HTTP on :9003
+```
 
 ## Others
 
