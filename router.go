@@ -18,9 +18,6 @@ func autoBindRouter(ginEngine *gin.Engine, whileRouter map[string]struct{}, serv
 	// 获取方法数量
 	methodNum := serverTypeOf.NumMethod()
 
-	//
-	ginGroup := ginEngine.Group(serverGroup.Name)
-
 	// 遍历获取所有与公开方法
 	for i := 0; i < methodNum; i++ {
 		// 获取方法
@@ -128,7 +125,7 @@ func autoBindRouter(ginEngine *gin.Engine, whileRouter map[string]struct{}, serv
 		}
 
 		// 添加路由
-		ginGroup.Handle("POST", method.Name, handlerFunc).Use(serverGroup.Middlewares...)
+		ginEngine.Handle("POST", routerUri, handlerFunc).Use(serverGroup.Middlewares...)
 		whileRouter[routerUri] = struct{}{}
 	}
 	return nil
