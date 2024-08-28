@@ -1,4 +1,4 @@
-module github.com/MikeLINGxZ/simple-server-runner
+module github.com/MikeLINGxZ/rome-router
 
 go 1.21.4
 
