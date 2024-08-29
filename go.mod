@@ -1,4 +1,4 @@
-module github.com/MikeLINGxZ/rome-router
+module github.com/MikeLINGxZ/rome_router
 
 go 1.21.4
 

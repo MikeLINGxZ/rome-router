@@ -72,23 +72,21 @@ func (s *Server) Run(addr ...string) error {
 
 func (s *Server) initRouter() error {
 
-	var init func(engine *gin.RouterGroup, parentRouter Router) error
+	var init func(engine *gin.RouterGroup, parentRouter Router, middlewares ...gin.HandlerFunc) error
 
-	init = func(engine *gin.RouterGroup, parentRouter Router) error {
-		groupEngine := engine.Group(parentRouter.Path)
+	init = func(groupEngine *gin.RouterGroup, parentRouter Router, middlewares ...gin.HandlerFunc) error {
+		groupEngine.Use(middlewares...)
 		// register handler server
 		if parentRouter.HandlerFunc != nil {
 			// get handlerFunc type
 			handlerFuncType := reflect.TypeOf(parentRouter.HandlerFunc)
 			switch handlerFuncType.Kind() {
 			case reflect.Func:
-				groupEngine.Use(parentRouter.Middlewares...)
 				err := s.bindRouter(groupEngine, "", parentRouter.Method, parentRouter.HandlerFunc)
 				if err != nil {
 					return err
 				}
 			case reflect.Ptr, reflect.Struct:
-				groupEngine.Use(parentRouter.Middlewares...)
 				err := s.bindGroupRouter(groupEngine, parentRouter.Path, parentRouter.Method, parentRouter.HandlerFunc)
 				if err != nil {
 					return err
@@ -100,7 +98,8 @@ func (s *Server) initRouter() error {
 
 		// register child router
 		for _, childRouter := range parentRouter.ChildRouter {
-			err := init(groupEngine, childRouter)
+			newGroupEngine := groupEngine.Group(childRouter.Path)
+			err := init(newGroupEngine, childRouter, childRouter.Middlewares...)
 			if err != nil {
 				return err
 			}
@@ -111,7 +110,7 @@ func (s *Server) initRouter() error {
 
 	for _, item := range s.routers {
 		group := s.engine.Group(item.Path)
-		err := init(group, item)
+		err := init(group, item, item.Middlewares...)
 		if err != nil {
 			return err
 		}

@@ -1,7 +1,7 @@
 package main
 
 import (
-	simple_server_runner "github.com/MikeLINGxZ/rome-router"
+	simple_server_runner "github.com/MikeLINGxZ/rome_router"
 	"github.com/gin-gonic/gin"
 )
 
