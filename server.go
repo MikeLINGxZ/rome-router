@@ -41,6 +41,10 @@ func NewServerWithRouters(routers []Router) *Server {
 	return &Server{engine: gin.Default(), routers: routers, response: defaultResponseHandler}
 }
 
+func (s *Server) Use(middleware ...gin.HandlerFunc) {
+	s.engine.Use(middleware...)
+}
+
 // AddRouter add a router to server
 func (s *Server) AddRouter(router Router) {
 	s.routers = append(s.routers, router)
